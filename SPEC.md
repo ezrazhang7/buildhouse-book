@@ -123,7 +123,7 @@ If neither is set, or delivery fails, the mentor sees an error with `CONTACT_EMA
 
 ## 7. Deploy (Vercel)
 
-1. Push this repo to GitHub and import it in Vercel. Framework preset: Next.js.
+1. Push this repo to GitHub and import it in Vercel. Framework preset: Next.js. `vercel.json` pins this, because a project imported before the app code existed detects no framework, keeps the preset "Other", looks for a static `public/` directory after the build and serves a 404 on every path even though `next build` succeeded. If the preset was already wrong, fix it in Project Settings too: a dashboard Output Directory override still wins.
 2. Set `MENTOR_PASSWORD` and `SESSION_SECRET`. The book works at this point from the committed seed. Give Preview its own `MENTOR_PASSWORD` value, and never set `AUTH_BYPASS` in Vercel (section 5).
 3. For live data: create a Google Cloud service account, enable the Sheets and Drive APIs, share the sheet and the form's upload folders with the account's email, and set `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `SHEET_ID`.
 4. For a "publish" button: create a Vercel deploy hook and call it from the sheet (Apps Script menu item) or on a daily schedule.
