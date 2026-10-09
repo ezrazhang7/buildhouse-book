@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assertBypassSafe, authBypass, gateConfig, isLocalDeployment, issueToken, passwordMatches, requestIsAuthed, safeNext, tokenIsValid } from '../lib/session.ts';
+import { assertBypassSafe, authBypass, gateConfig, gateFingerprint, isLocalDeployment, issueToken, passwordMatches, requestIsAuthed, safeNext, tokenIsValid } from '../lib/session.ts';
 
 const cfg = { password: 'correct horse battery', secret: 'x'.repeat(48) };
 
@@ -94,4 +94,33 @@ test('on a deployment nothing but a real cookie gets in', async () => {
   assert.equal(await requestIsAuthed(token, { VERCEL: '1', ...live, MENTOR_PASSWORD: 'rotated password' }), false);
   // No password configured and no bypass: shut, as before.
   assert.equal(await requestIsAuthed(token, { VERCEL: '1' }), false);
+});
+
+test('whitespace a dashboard paste adds does not change the password', async () => {
+  const pasted = gateConfig({ MENTOR_PASSWORD: `  ${cfg.password}\n`, SESSION_SECRET: `${cfg.secret}\n` });
+  assert.ok(pasted);
+  assert.equal(pasted.password, cfg.password);
+  assert.equal(pasted.secret, cfg.secret);
+  // And a typed attempt with a stray trailing space still opens the book.
+  assert.equal(await passwordMatches(`${cfg.password} `, cfg), true);
+  assert.equal(await passwordMatches(`\n${cfg.password}`, cfg), true);
+  // A cookie signed on one of them is valid on the other, so trimming does not sign anyone out twice.
+  assert.equal(await tokenIsValid(await issueToken(pasted), gateConfig({ MENTOR_PASSWORD: cfg.password, SESSION_SECRET: cfg.secret })), true);
+});
+
+test('trimming does not let a wrong password through', async () => {
+  assert.equal(await passwordMatches(`${cfg.password}x`, cfg), false);
+  assert.equal(await passwordMatches(`"${cfg.password}"`, cfg), false);
+  assert.equal(await passwordMatches('   ', cfg), false);
+  // Quotes are kept, because a password may legitimately contain them. A dashboard field that holds
+  // "a phrase" with the quotes is a different password, and the fingerprint is how that shows up.
+  assert.equal(gateConfig({ MENTOR_PASSWORD: `"${cfg.password}"`, SESSION_SECRET: cfg.secret })?.password, `"${cfg.password}"`);
+});
+
+test('the fingerprint identifies a password without revealing it', async () => {
+  const fp = await gateFingerprint(cfg);
+  assert.match(fp, /^21 characters, fingerprint [0-9a-f]{8}$/);
+  assert.equal(await gateFingerprint(cfg), fp);
+  assert.notEqual(await gateFingerprint({ ...cfg, password: `${cfg.password} ` }), fp);
+  assert.ok(!fp.includes(cfg.password));
 });

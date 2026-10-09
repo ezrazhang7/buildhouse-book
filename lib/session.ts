@@ -27,14 +27,27 @@ export type GateConfig = { password: string; secret: string };
 
 /** Null when the deployment is missing its password or secret. The gate then stays shut for everyone. */
 export function gateConfig(env: Record<string, string | undefined> = process.env): GateConfig | null {
-  const password = env.MENTOR_PASSWORD ?? '';
-  const secret = env.SESSION_SECRET ?? '';
+  // Trimmed: a value pasted into a hosting dashboard often carries a trailing newline or space, and
+  // whitespace that nobody can see is not something a mentor or the BuildHouse team could diagnose.
+  const password = (env.MENTOR_PASSWORD ?? '').trim();
+  const secret = (env.SESSION_SECRET ?? '').trim();
   if (password.length < 8 || secret.length < 32) return null;
   return { password, secret };
 }
 
 export async function passwordMatches(attempt: string, cfg: GateConfig): Promise<boolean> {
-  return sameBytes(await sha256(`pw:${attempt}`), await sha256(`pw:${cfg.password}`));
+  // Trimmed on both sides, for the same reason: a phone keyboard appends a space to a typed phrase.
+  return sameBytes(await sha256(`pw:${attempt.trim()}`), await sha256(`pw:${cfg.password}`));
+}
+
+/**
+ * Enough to tell two environments apart, not enough to reveal the password: its length and four
+ * bytes of its hash. Logged at boot so a password that differs between a laptop and hosting can be
+ * found by comparing, rather than by guessing at what a dashboard field contains.
+ */
+export async function gateFingerprint(cfg: GateConfig): Promise<string> {
+  const hex = [...(await sha256(`fp:${cfg.password}`)).slice(0, 4)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `${cfg.password.length} characters, fingerprint ${hex}`;
 }
 
 // The signing key mixes in the password, so changing the password signs every mentor out.

@@ -96,6 +96,8 @@ Without credentials the build uses the committed `content/profiles.json`.
 - The home page is rendered on the server per request, so founder data only exists in responses that passed the check. Compiled static files contain none of it.
 - Password is compared in constant time. On success the server sets a 30-day cookie: `HttpOnly`, `Secure`, `SameSite=Lax`, signed with HMAC-SHA256. The signing key is derived from `SESSION_SECRET` and the password, so **changing the password signs every mentor out**.
 - If `MENTOR_PASSWORD` (8+ characters) or `SESSION_SECRET` (32+) is missing, nobody gets in.
+- Both are trimmed, and so is a typed attempt: a value pasted into a hosting dashboard arrives with a trailing newline often enough, and invisible whitespace is not a thing a mentor could diagnose. Quotes are kept, because a password may contain them, so `"a phrase"` pasted into Vercel is a different password than `a phrase`.
+- Each server logs one `gate:` line at boot giving the configured password's length and four bytes of its hash. `npm run fingerprint` prints the same for a phrase, so a password that differs between a laptop and hosting is found by comparing rather than guessing. Anyone who can read these logs already has more access than the fingerprint gives them.
 - Eight wrong tries per address per ten minutes, then a wait. This counter lives in one server instance's memory, so it slows guessing but does not stop a determined attacker; the password should be a long phrase.
 - Headers on everything: `X-Robots-Tag: noindex`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` (the book's address is not leaked to LinkedIn or Instagram on click-through), `Cache-Control: private, no-store` on gated responses. `robots.txt` disallows all.
 - Limits of a shared password: it can be forwarded, and there is no record of which mentor opened what. Rotating it is the only way to revoke access.
@@ -131,7 +133,7 @@ If neither is set, or delivery fails, the mentor sees an error with `CONTACT_EMA
 
 ## 8. Checked, and not checked
 
-Checked on 2026-10-09 against a local production build: 19 unit tests (row mapping, link safety, token signing, expiry, tampering, password rotation); every route, image path and data path refuses a visitor without a cookie; forged cookie refused; compiled static files contain no founder data; the seed output contains no emails, phone numbers or dues; cover, contents filter, page turn, deep links, story and offer dialogs, and the phone pager driven in Chromium at 1440x900, 1280x640 and 390x844.
+Checked on 2026-10-09 against a local production build: 22 unit tests (row mapping, link safety, token signing, expiry, tampering, password rotation); every route, image path and data path refuses a visitor without a cookie; forged cookie refused; compiled static files contain no founder data; the seed output contains no emails, phone numbers or dues; cover, contents filter, page turn, deep links, story and offer dialogs, and the phone pager driven in Chromium at 1440x900, 1280x640 and 390x844.
 
 The developer bypass was checked end to end on 2026-10-09: with the flag set, the dev server serves the book with no password and `/api/offer` is reachable; with it unset, pages redirect to `/unlock`, the API answers 401 and `/media` is gated; ten wrong passwords in a row on loopback never trip the limiter and the correct one still works; a local production build ignores the flag, warns, and enforces the gate; and the same build with `VERCEL=1` refuses to boot and answers 500 to everything.
 

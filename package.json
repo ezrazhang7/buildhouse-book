@@ -10,7 +10,8 @@
     "prebuild": "node scripts/sync-sheet.mjs --if-configured",
     "build": "next build",
     "start": "next start",
-    "test": "node --test tests/*.test.mjs tests/*.test.ts"
+    "test": "node --test tests/*.test.mjs tests/*.test.ts",
+    "fingerprint": "node scripts/fingerprint.mjs"
   },
   "dependencies": {
     "@fontsource-variable/big-shoulders-display": "^5.3.0",

@@ -24,6 +24,7 @@ To preview against the real gate, run `npm run build && npm start`, where the fl
 | `npm run sync` | Pulls the Profiles tab and its Drive images into `content/` and `public/media/` |
 | `npm run seed` | Rebuilds `content/profiles.json` and `seed/profiles-tab.csv` from `seed/profiles.seed.mjs` |
 | `npm test` | Unit tests |
+| `npm run fingerprint -- "the phrase"` | Prints a password's length and a short hash, to compare with the `gate:` line a server logs at boot |
 
 ## Where things are
 
@@ -34,6 +35,19 @@ To preview against the real gate, run `npm run build && npm start`, where the fl
 - `scripts/sync-sheet.mjs`: sheet and Drive sync
 - `app/api/offer`: "I can help" notes
 - `seed/profiles-tab.csv`: import this into the sheet as a tab named `Profiles`
+
+## When the password is refused
+
+Every server prints one line at boot: `gate: password set (N characters, fingerprint abcd1234)`.
+Run `npm run fingerprint -- "the phrase"` on the phrase you are typing and compare. Different
+fingerprint means the deployment holds a different password, not that the gate is broken.
+
+On Vercel, **an environment variable change does not reach a deployment that already exists** —
+redeploy after editing `MENTOR_PASSWORD`. Note also that the dashboard stores the value raw: it
+keeps quotes you paste around a phrase, where a local `.env.local` would strip them. Surrounding
+whitespace is trimmed on both sides, so that much is safe.
+
+Changing `MENTOR_PASSWORD` re-derives the signing key, so every mentor is signed out.
 
 ## Editing content
 
