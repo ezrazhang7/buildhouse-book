@@ -92,14 +92,16 @@ Without credentials the build uses the committed `content/profiles.json`.
 
 ## 5. Access and privacy
 
-- `proxy.ts` checks every request except `/unlock`, `/api/unlock`, `/robots.txt` and the compiled JS/CSS/fonts. No cookie means a redirect to `/unlock` (pages, images) or a 401 (API).
+- `proxy.ts` checks every request except `/unlock`, `/api/unlock`, `/robots.txt`, `/lock` and the compiled JS/CSS/fonts. No cookie means a redirect to `/unlock` (pages, images) or a 401 (API).
+- `/lock` unsets the cookie and returns to `/unlock`. It is open on purpose: a way out of a session has to work while holding a cookie the gate rejects, and gating it would turn away exactly the person trying to clear it. It reveals nothing. The back page's button posts to `/api/lock` for the same effect; `/lock` exists so it can also be a link a mentor on a shared laptop is sent.
 - The home page is rendered on the server per request, so founder data only exists in responses that passed the check. Compiled static files contain none of it.
 - Password is compared in constant time. On success the server sets a 30-day cookie: `HttpOnly`, `Secure`, `SameSite=Lax`, signed with HMAC-SHA256. The signing key is derived from `SESSION_SECRET` and the password, so **changing the password signs every mentor out**.
 - If `MENTOR_PASSWORD` (8+ characters) or `SESSION_SECRET` (32+) is missing, nobody gets in.
 - Both are trimmed, and so is a typed attempt: a value pasted into a hosting dashboard arrives with a trailing newline often enough, and invisible whitespace is not a thing a mentor could diagnose. Quotes are kept, because a password may contain them, so `"a phrase"` pasted into Vercel is a different password than `a phrase`.
 - Each server logs one `gate:` line at boot giving the configured password's length and four bytes of its hash. `npm run fingerprint` prints the same for a phrase, so a password that differs between a laptop and hosting is found by comparing rather than guessing. Anyone who can read these logs already has more access than the fingerprint gives them.
 - Eight wrong tries per address per ten minutes, then a wait. This counter lives in one server instance's memory, so it slows guessing but does not stop a determined attacker; the password should be a long phrase.
-- Headers on everything: `X-Robots-Tag: noindex`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` (the book's address is not leaked to LinkedIn or Instagram on click-through), `Cache-Control: private, no-store` on gated responses. `robots.txt` disallows all.
+- Headers on everything: `X-Robots-Tag: noindex`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` (the book's address is not leaked to LinkedIn or Instagram on click-through). `robots.txt` disallows all.
+- Every response the proxy gives is `Cache-Control: private, no-store, max-age=0, must-revalidate`, **the redirects included**, and the redirects also say `Vary: Cookie`. Next's default on a middleware redirect is `public`, which is not free: a browser that stored `/ -> /unlock` before the login replays it afterwards, while `/unlock` is fetched fresh, sees the new cookie and returns the mentor to `/`, which is a redirect loop that clears only when the cached redirect expires. On pass-through responses Next replaces `Vary` with its own router list after the proxy runs; `no-store` survives there, and that is the half that stops a cache sharing one mentor's page with the next visitor.
 - Limits of a shared password: it can be forwarded, and there is no record of which mentor opened what. Rotating it is the only way to revoke access.
 
 ### Reading the book while building it
@@ -134,6 +136,8 @@ If neither is set, or delivery fails, the mentor sees an error with `CONTACT_EMA
 ## 8. Checked, and not checked
 
 Checked on 2026-10-09 against a local production build: 22 unit tests (row mapping, link safety, token signing, expiry, tampering, password rotation); every route, image path and data path refuses a visitor without a cookie; forged cookie refused; compiled static files contain no founder data; the seed output contains no emails, phone numbers or dues; cover, contents filter, page turn, deep links, story and offer dialogs, and the phone pager driven in Chromium at 1440x900, 1280x640 and 390x844.
+
+Checked on the same build: `/lock` unsets the cookie and locks the book again, including when the cookie it is holding is one the gate rejects; every proxy answer, redirects included, carries `private, no-store`; the authed `/unlock` redirect carries `Vary: Cookie`; following `/unlock` with a valid cookie ends at `/` in exactly one redirect, and `/` in none.
 
 The developer bypass was checked end to end on 2026-10-09: with the flag set, the dev server serves the book with no password and `/api/offer` is reachable; with it unset, pages redirect to `/unlock`, the API answers 401 and `/media` is gated; ten wrong passwords in a row on loopback never trip the limiter and the correct one still works; a local production build ignores the flag, warns, and enforces the gate; and the same build with `VERCEL=1` refuses to boot and answers 500 to everything.
 

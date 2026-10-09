@@ -25,6 +25,7 @@ To preview against the real gate, run `npm run build && npm start`, where the fl
 | `npm run seed` | Rebuilds `content/profiles.json` and `seed/profiles-tab.csv` from `seed/profiles.seed.mjs` |
 | `npm test` | Unit tests |
 | `npm run fingerprint -- "the phrase"` | Prints a password's length and a short hash, to compare with the `gate:` line a server logs at boot |
+| `npm run fresh -- <url>` | Opens the book in a throwaway Chrome profile: no cookies, no cached redirects, nothing kept |
 
 ## Where things are
 
@@ -35,6 +36,24 @@ To preview against the real gate, run `npm run build && npm start`, where the fl
 - `scripts/sync-sheet.mjs`: sheet and Drive sync
 - `app/api/offer`: "I can help" notes
 - `seed/profiles-tab.csv`: import this into the sheet as a tab named `Profiles`
+
+## When `/` and `/unlock` bounce off each other
+
+A redirect the browser cached, not a cookie — so clearing cookies alone will not stop it. Either:
+
+```bash
+npm run fresh -- https://your-deployment.vercel.app   # throwaway Chrome profile, no cookies or cache
+```
+
+or open a private window. The gated redirects are `no-store` now, so a stored one cannot outlive a
+login, but one a browser kept from before that fix still has to expire on its own.
+
+To end a session deliberately, visit **`/lock`** — it unsets the cookie and returns you to the
+password page. It works even while holding a cookie the gate rejects, which is the case the back
+page's button cannot reach. `curl` cannot help here: it keeps its own cookie jar, not Chrome's.
+
+Note also that changing `MENTOR_PASSWORD` or `SESSION_SECRET` re-derives the signing key, so any
+cookie issued before the change is already invalid.
 
 ## When the password is refused
 
